@@ -112,6 +112,34 @@ async function main() {
     });
     adminCookie = admin.cookie;
     check(admin.status === 200, "admin login");
+
+    const adminPublished = await request(
+      "/api/admin/questions",
+      "POST",
+      {
+        eventCode: code,
+        content: "Admin translated question ready for display.",
+      },
+      adminCookie,
+    );
+    const adminPublishedId = adminPublished.json.question?.id;
+    check(
+      adminPublished.status === 201 &&
+        adminPublished.json.question?.status === "APPROVED",
+      "admin can publish an approved question directly",
+    );
+
+    const directDisplay = await request(`/api/events/${code}/display`);
+    check(
+      directDisplay.status === 200 &&
+        directDisplay.json.total === 1 &&
+        directDisplay.json.questions[0]?.id === adminPublishedId &&
+        !JSON.stringify(directDisplay.json).includes("cwid"),
+      "display feed exposes newly approved admin question without identity",
+    );
+
+    await db.question.delete({ where: { id: adminPublishedId } });
+
     const submission = await request(path, "POST", {
       content: "测试问题：审核后才可见。",
     });
@@ -148,6 +176,13 @@ async function main() {
     check(
       pool.json.total === 1 && pool.json.questions[0].id === id,
       "approved question visible",
+    );
+    const displayAfterApprove = await request(`/api/events/${code}/display`);
+    check(
+      displayAfterApprove.status === 200 &&
+        displayAfterApprove.json.total === 1 &&
+        displayAfterApprove.json.questions[0]?.id === id,
+      "approved question appears in display feed",
     );
     check(
       !JSON.stringify(pool.json).includes("C-TEST") &&
