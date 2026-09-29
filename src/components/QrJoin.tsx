@@ -7,7 +7,7 @@ export function QrJoin({ eventId }: { eventId: string }) {
   const [src, setSrc] = useState("");
 
   useEffect(() => {
-    const url = `${window.location.origin}/event/${encodeURIComponent(eventId)}`;
+    const url = `${window.location.origin}/event/${encodeURIComponent(eventId)}/ask`;
     QRCode.toDataURL(url, {
       width: 220,
       margin: 1,
