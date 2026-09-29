@@ -1,5 +1,21 @@
 # Event Q&A
 
+## Current three-link workflow
+
+For each event, the product now exposes three separate links:
+
+```text
+Participant ask page   /event/{eventCode}/ask
+Moderator console      /admin
+iPad display page      /event/{eventCode}/display
+```
+
+- The **ask page** only contains anonymous question submission.
+- The **moderator console** reviews participant questions and can also publish a translated/edited question directly to the display.
+- The **display page** is designed for iPad viewing: one-column cards, vertical scrolling, and automatic refresh every 1.5 seconds.
+- Approved participant questions and moderator-published questions appear on the display feed automatically.
+- The legacy `/event/{eventCode}` and `/event/{eventCode}/login` routes redirect to the ask page.
+
 A lightweight, standalone audience Q&A system for live events.
 
 ```text
