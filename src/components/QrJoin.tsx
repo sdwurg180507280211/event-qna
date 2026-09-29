@@ -7,7 +7,7 @@ export function QrJoin({ eventId }: { eventId: string }) {
   const [src, setSrc] = useState("");
 
   useEffect(() => {
-    const url = `${window.location.origin}/event/${encodeURIComponent(eventId)}/login`;
+    const url = `${window.location.origin}/event/${encodeURIComponent(eventId)}`;
     QRCode.toDataURL(url, {
       width: 220,
       margin: 1,
@@ -28,7 +28,7 @@ export function QrJoin({ eventId }: { eventId: string }) {
       </div>
       <div>
         <strong>手机扫码参与提问</strong>
-        <p>扫码后输入 CWID 验证身份</p>
+        <p>扫码即可匿名提问</p>
       </div>
     </aside>
   );

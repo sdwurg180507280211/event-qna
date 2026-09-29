@@ -17,7 +17,6 @@ type Question = {
   content: string;
   status: Status;
   createdAt: string;
-  voteCount: number;
 };
 type Entry = { cwid: string; name: string | null; enabled: boolean };
 type Settings = {
@@ -227,7 +226,7 @@ export function AdminClient() {
       });
       await loadEntries();
       setNotice(
-        entry.enabled ? "已禁用，该白名单用户的现有登录也将失效" : "已重新启用",
+        entry.enabled ? "历史名单条目已禁用，不影响公开提问" : "已重新启用",
       );
     });
   }
@@ -332,7 +331,7 @@ export function AdminClient() {
           {(
             [
               { id: "questions", label: "问题审核", icon: "chat" },
-              { id: "whitelist", label: "CWID 白名单", icon: "users" },
+              { id: "whitelist", label: "历史白名单", icon: "users" },
               { id: "settings", label: "活动设置", icon: "settings" },
             ] as const
           ).map((item) => (
@@ -356,7 +355,7 @@ export function AdminClient() {
         <div className="sidebar-bottom">
           <Icon name="shield" size={18} />
           <span>
-            管理员工作台<small>前台匿名 · 后台可追溯</small>
+            管理员工作台<small>匿名提问 · 人工审核</small>
           </span>
         </div>
       </aside>
@@ -367,13 +366,13 @@ export function AdminClient() {
             {section === "questions"
               ? "问题审核"
               : section === "whitelist"
-                ? "CWID 白名单"
+                ? "历史白名单"
                 : "活动设置"}
           </span>
           <div className="header-actions">
             <a
               className="button ghost small"
-              href={`/event/${encodeURIComponent(eventCode)}/login`}
+              href={`/event/${encodeURIComponent(eventCode)}`}
               target="_blank"
               rel="noreferrer"
             >
@@ -401,7 +400,7 @@ export function AdminClient() {
                 {section === "questions"
                   ? "问题审核"
                   : section === "whitelist"
-                    ? "CWID 白名单"
+                    ? "历史白名单"
                     : "活动设置"}
               </h1>
               <p className="muted">
@@ -409,7 +408,7 @@ export function AdminClient() {
                 {section === "questions"
                   ? "审核通过后，问题将自动展示在用户端"
                   : section === "whitelist"
-                    ? "维护可通过 CWID 登录的活动参与名单"
+                    ? "公开提问无需登录，此名单仅保留历史资料"
                     : "配置活动信息、品牌展示与直播入口"}
               </p>
             </div>
@@ -539,10 +538,6 @@ export function AdminClient() {
                           <time>
                             {new Date(q.createdAt).toLocaleString("zh-CN")}
                           </time>
-                          <span className="admin-votes">
-                            <Icon name="like" size={14} />
-                            {q.voteCount}
-                          </span>
                         </div>
                         <p>{q.content}</p>
                         <div className="moderation-actions">
@@ -727,7 +722,7 @@ export function AdminClient() {
                   }
                 />
                 <span>
-                  活动开放<small>关闭后暂停参与者登录、提问和点赞。</small>
+                  活动开放<small>关闭后暂停公开提问和问题池访问。</small>
                 </span>
               </label>
               <div className="settings-footer">

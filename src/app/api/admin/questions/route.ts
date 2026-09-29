@@ -58,7 +58,6 @@ export async function GET(request: Request) {
       createdAt: true,
       reviewedAt: true,
       reviewedBy: true,
-      _count: { select: { votes: true } },
     },
   });
   return NextResponse.json({
@@ -66,9 +65,6 @@ export async function GET(request: Request) {
     page,
     pageSize,
     counts: Object.fromEntries(grouped.map((g) => [g.status, g._count])),
-    questions: questions.map(({ _count, ...q }) => ({
-      ...q,
-      voteCount: _count.votes,
-    })),
+    questions,
   });
 }

@@ -88,3 +88,9 @@ Approved questions are shown anonymously to participants.
 - Disabling a whitelist participant invalidates existing sessions on their next request.
 - Livestream tickets must contain iat/exp, be at most five minutes old and have a lifetime no longer than five minutes.
 - The HTTP server address is for acceptance; actual livestream integration and production domain/HTTPS are separate integration steps.
+
+## 当前调整：移除点赞与热门
+参与页不展示点赞或排序切换，后台不展示点赞数。问题固定按创建时间倒序，相同时间以 ID 作为稳定次序；旧热门参数不改变顺序。旧点赞接口返回 410，历史投票数据保留但不参与展示与排序。
+
+## 当前调整：公开匿名入口
+链接和二维码均直接进入提问页；旧 /login 地址自动跳转。用户无需 CWID、白名单或直播 Ticket；后台密码登录保持不变。新问题统一记录为匿名访客，仍须审核。活动关闭后不可访问或提交。历史白名单不限制公开入口。

@@ -57,3 +57,11 @@
 ```sh
 ssh aliyun 'podman run --rm --network event-qna --env-file /opt/event-qna/app.env -e TEST_BASE_URL=http://event-qna-web:3000 -v /opt/event-qna/integration.ts:/app/scripts/integration.ts:ro docker.io/library/event-qna:acceptance node scripts/integration.ts'
 ```
+
+## 移除点赞与热门排序
+界面删除参与页点赞及最新/热门切换，后台删除点赞数；公开查询固定 createdAt DESC、id DESC，旧 sort=hot 不改变顺序，响应不包含 voteCount/hasVoted。旧 PUT/DELETE 点赞入口返回 410，保留历史 Vote 表但不再新增或用于排序。本地 29 项真实数据库/API 检查通过，新增覆盖最新优先、旧热门参数及旧投票入口。
+
+## 公开匿名入口
+本地 30 项业务检查通过。另用无登录、无白名单的临时活动实测：旧登录链接直接跳转、无 Cookie 提交为匿名待审核、通过后自动显示、二维码实际解码为直达提问页、手机免登录进入、活动关闭时拒绝读写且不循环跳转。临时活动已清理。管理员登录继续受保护。
+
+已部署并通过公网浏览器检查：无登录直接访问、旧入口自动重定向、点赞与排序切换消失、问题创建时间倒序、分页时问题池尺寸固定。服务器环境 30 项集成检查全部通过，测试活动自动清理；后台密码保护保持有效。

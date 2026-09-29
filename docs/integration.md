@@ -1,3 +1,5 @@
+> 当前版本已改为公开匿名入口：直播方直接放置 `/event/{eventCode}` 链接即可，无需身份透传。二维码使用同一入口；旧 `/login` 链接会重定向。下述 Ticket 协议仅为历史兼容参考，不再是参与条件。
+
 # Livestream integration
 
 ## Link

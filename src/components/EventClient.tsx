@@ -22,8 +22,6 @@ type Question = {
   id: string;
   content: string;
   createdAt: string;
-  voteCount: number;
-  hasVoted: boolean;
 };
 function relativeTime(value: string) {
   const minutes = Math.max(
@@ -41,7 +39,6 @@ function relativeTime(value: string) {
 export function EventClient({ eventId }: { eventId: string }) {
   const [event, setEvent] = useState<EventInfo | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [sort, setSort] = useState<"latest" | "hot">("latest");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
   const questionList = useRef<HTMLDivElement>(null);
@@ -78,24 +75,22 @@ export function EventClient({ eventId }: { eventId: string }) {
   const [syncError, setSyncError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [voting, setVoting] = useState<string[]>([]);
-  const voteLocks = useRef(new Set<string>());
   const generation = useRef(0);
   const base = `/api/events/${encodeURIComponent(eventId)}`;
-  const goToLogin = useCallback(
-    () =>
-      window.location.replace(`/event/${encodeURIComponent(eventId)}/login`),
-    [eventId],
-  );
   const loadQuestions = useCallback(async () => {
     const id = ++generation.current;
     const response = await fetch(
-      `${base}/questions?sort=${sort}&page=${page}&pageSize=${pageSize}`,
+      `${base}/questions?page=${page}&pageSize=${pageSize}`,
       { cache: "no-store" },
     );
     if (id !== generation.current) return;
-    if (response.status === 401) {
-      goToLogin();
+    if (response.status === 404) {
+      setEvent(null);
+      setQuestions([]);
+      setTotal(0);
+      setError("活动不存在或已结束");
+      setSyncError("");
+      setLoading(false);
       return;
     }
     if (!response.ok) throw new Error("暂时无法更新问题池，请检查网络");
@@ -106,7 +101,7 @@ export function EventClient({ eventId }: { eventId: string }) {
     setPage(data.page);
     setSyncError("");
     setLoading(false);
-  }, [base, goToLogin, sort, page, pageSize]);
+  }, [base, page, pageSize]);
   useEffect(() => {
     const controller = new AbortController();
     fetch(base, { signal: controller.signal, cache: "no-store" })
@@ -152,10 +147,6 @@ export function EventClient({ eventId }: { eventId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
       });
-      if (r.status === 401) {
-        goToLogin();
-        return;
-      }
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "提交失败，请重试");
       setContent("");
@@ -164,43 +155,6 @@ export function EventClient({ eventId }: { eventId: string }) {
       setError(e instanceof Error ? e.message : "网络异常，请重试");
     } finally {
       setSubmitting(false);
-    }
-  }
-  async function toggleVote(q: Question) {
-    if (voteLocks.current.has(q.id)) return;
-    voteLocks.current.add(q.id);
-    setVoting([...voteLocks.current]);
-    try {
-      const r = await fetch(`${base}/questions/${q.id}/vote`, {
-        method: q.hasVoted ? "DELETE" : "PUT",
-      });
-      if (r.status === 401) {
-        goToLogin();
-        return;
-      }
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || "点赞失败");
-      setQuestions((current) =>
-        current.map((item) =>
-          item.id === q.id
-            ? { ...item, hasVoted: data.voted, voteCount: data.voteCount }
-            : item,
-        ),
-      );
-      await loadQuestions();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "网络异常，请重试");
-    } finally {
-      voteLocks.current.delete(q.id);
-      setVoting([...voteLocks.current]);
-    }
-  }
-  async function logout() {
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-      goToLogin();
-    } catch {
-      setError("退出失败，请重试");
     }
   }
   return (
@@ -214,9 +168,7 @@ export function EventClient({ eventId }: { eventId: string }) {
           )}
         </div>
         <Brand title={event?.title} logoUrl={event?.logoUrl} />
-        <button className="button ghost small" onClick={logout}>
-          <Icon name="logout" size={16} /> 退出
-        </button>
+        <div aria-hidden="true" />
       </header>
       <div className="event-grid">
         <aside className="ask-column">
@@ -253,7 +205,7 @@ export function EventClient({ eventId }: { eventId: string }) {
               </button>
             </form>
             <p className="privacy-note">
-              <Icon name="shield" size={14} /> 问题公开时不显示姓名或 CWID
+              <Icon name="shield" size={14} /> 提问将以匿名形式公开展示
             </p>
             {message && (
               <div className="success-box" role="status">
@@ -279,21 +231,6 @@ export function EventClient({ eventId }: { eventId: string }) {
                   问题池 <span className="count-badge">{total}</span>
                 </h2>
               </div>
-            </div>
-            <div className="segmented" role="group" aria-label="问题排序">
-              {(["latest", "hot"] as const).map((value) => (
-                <button
-                  key={value}
-                  aria-pressed={sort === value}
-                  className={sort === value ? "active" : ""}
-                  onClick={() => {
-                    setSort(value);
-                    setPage(1);
-                  }}
-                >
-                  {value === "latest" ? "最新" : "热门"}
-                </button>
-              ))}
             </div>
           </div>
           <div
@@ -326,16 +263,6 @@ export function EventClient({ eventId }: { eventId: string }) {
                     <time title={new Date(q.createdAt).toLocaleString("zh-CN")}>
                       {relativeTime(q.createdAt)}
                     </time>
-                    <button
-                      className={`vote-button ${q.hasVoted ? "voted" : ""}`}
-                      aria-label={q.hasVoted ? "取消点赞" : "点赞"}
-                      aria-pressed={q.hasVoted}
-                      disabled={voting.includes(q.id)}
-                      onClick={() => toggleVote(q)}
-                    >
-                      <Icon name="like" size={17} />
-                      <span>{q.voteCount}</span>
-                    </button>
                   </div>
                   <QuestionBody content={q.content} />
                 </article>

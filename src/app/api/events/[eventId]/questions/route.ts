@@ -3,7 +3,6 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { apiError } from "@/lib/http";
 import { participantFor } from "@/lib/participant";
-import { voterKey } from "@/lib/normalize";
 
 type Context = { params: Promise<{ eventId: string }> };
 const submitSchema = z.object({ content: z.string().trim().min(2).max(1000) });
@@ -15,13 +14,12 @@ const paging = z.object({
 export async function GET(request: Request, context: Context) {
   const { eventId } = await context.params;
   const access = await participantFor(eventId);
-  if (!access) return apiError("登录已失效或活动已结束，请重新验证", 401);
-  const { session, event } = access;
+  if (!access) return apiError("活动不存在或已结束", 404);
+  const { event } = access;
   const url = new URL(request.url);
   const parsed = paging.safeParse(Object.fromEntries(url.searchParams));
   if (!parsed.success) return apiError("分页参数无效");
   const { pageSize } = parsed.data;
-  const key = voterKey(event.code, session.cwid);
   const where = { eventId: event.id, status: "APPROVED" as const };
   const total = await db.question.count({ where });
   const page = Math.min(
@@ -30,18 +28,13 @@ export async function GET(request: Request, context: Context) {
   );
   const questions = await db.question.findMany({
     where,
-    orderBy:
-      url.searchParams.get("sort") === "hot"
-        ? [{ votes: { _count: "desc" } }, { createdAt: "desc" }, { id: "desc" }]
-        : [{ createdAt: "desc" }, { id: "desc" }],
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     skip: (page - 1) * pageSize,
     take: pageSize,
     select: {
       id: true,
       content: true,
       createdAt: true,
-      _count: { select: { votes: true } },
-      votes: { where: { voterKey: key }, select: { id: true }, take: 1 },
     },
   });
   return NextResponse.json({
@@ -52,8 +45,6 @@ export async function GET(request: Request, context: Context) {
       id: q.id,
       content: q.content,
       createdAt: q.createdAt,
-      voteCount: q._count.votes,
-      hasVoted: q.votes.length > 0,
     })),
   });
 }
@@ -61,7 +52,7 @@ export async function GET(request: Request, context: Context) {
 export async function POST(request: Request, context: Context) {
   const { eventId } = await context.params;
   const access = await participantFor(eventId);
-  if (!access) return apiError("登录已失效或活动已结束，请重新验证", 401);
+  if (!access) return apiError("活动不存在或已结束", 404);
   try {
     const input = submitSchema.parse(await request.json());
     const question = await db.question.create({

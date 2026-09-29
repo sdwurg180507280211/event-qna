@@ -48,10 +48,29 @@ async function ticket(
     iss: process.env.STREAM_TICKET_ISSUER ?? "livestream",
     aud: process.env.STREAM_TICKET_AUDIENCE ?? "event-qna",
     ...(!overrides.omitIat ? { iat: now } : {}),
-    ...(!overrides.omitExp ? { exp: now + (overrides.exp === "-1m" ? -60 : overrides.exp === "1h" ? 3600 : 300) } : {}),
+    ...(!overrides.omitExp
+      ? {
+          exp:
+            now +
+            (overrides.exp === "-1m"
+              ? -60
+              : overrides.exp === "1h"
+                ? 3600
+                : 300),
+        }
+      : {}),
   };
-  const message = Buffer.from(JSON.stringify({ alg: "HS256" })).toString("base64url") + "." + Buffer.from(JSON.stringify(payload)).toString("base64url");
-  return message + "." + createHmac("sha256", process.env.STREAM_SSO_SECRET!).update(message).digest("base64url");
+  const message =
+    Buffer.from(JSON.stringify({ alg: "HS256" })).toString("base64url") +
+    "." +
+    Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return (
+    message +
+    "." +
+    createHmac("sha256", process.env.STREAM_SSO_SECRET!)
+      .update(message)
+      .digest("base64url")
+  );
 }
 async function main() {
   try {
@@ -65,7 +84,10 @@ async function main() {
       },
     });
     const path = `/api/events/${code}/questions`;
-    check((await request(path)).status === 401, "unauthenticated pool denied");
+    check(
+      (await request(path)).status === 200,
+      "public pool accessible without login",
+    );
     check(
       (await request("/api/admin/questions?eventCode=" + code)).status === 401,
       "admin requires session",
@@ -90,17 +112,14 @@ async function main() {
     });
     adminCookie = admin.cookie;
     check(admin.status === 200, "admin login");
-    const submission = await request(
-      path,
-      "POST",
-      { content: "测试问题：审核后才可见。" },
-      userCookie,
-    );
+    const submission = await request(path, "POST", {
+      content: "测试问题：审核后才可见。",
+    });
     const id = submission.json.question.id;
     check(
       submission.status === 201 &&
         submission.json.question.status === "PENDING",
-      "submission defaults pending",
+      "submission without login defaults pending",
     );
     check(
       (await request(path, "GET", undefined, userCookie)).json.total === 0,
@@ -108,8 +127,12 @@ async function main() {
     );
     check(
       (await request(path + "/" + id + "/vote", "PUT", undefined, userCookie))
-        .status === 404,
-      "pending cannot be voted on",
+        .status === 410,
+      "legacy voting endpoint removed",
+    );
+    check(
+      (await db.question.findUnique({ where: { id } }))?.cwid === "匿名访客",
+      "public submission records anonymous guest instead of identity",
     );
     const moderate = (status: string) =>
       request(`/api/admin/questions/${id}`, "PATCH", { status }, adminCookie);
@@ -133,21 +156,17 @@ async function main() {
       "participant response anonymous",
     );
     const votePath = `${path}/${id}/vote`;
-    const votes = await Promise.all(
-      Array.from({ length: 5 }, () =>
-        request(votePath, "PUT", undefined, userCookie),
-      ),
+    check(
+      (await request(votePath, "PUT", undefined, userCookie)).status === 410 &&
+        (await request(votePath, "DELETE", undefined, userCookie)).status ===
+          410 &&
+        (await db.vote.count({ where: { questionId: id } })) === 0,
+      "removed vote endpoints cannot change data",
     );
     check(
-      votes.every((v) => v.status === 200) &&
-        (await db.vote.count({ where: { questionId: id } })) === 1,
-      "concurrent repeated votes are idempotent",
-    );
-    await request(votePath, "DELETE", undefined, userCookie);
-    await request(votePath, "DELETE", undefined, userCookie);
-    check(
-      (await db.vote.count({ where: { questionId: id } })) === 0,
-      "unvote is idempotent",
+      !("voteCount" in pool.json.questions[0]) &&
+        !("hasVoted" in pool.json.questions[0]),
+      "question response excludes removed vote fields",
     );
     await moderate("HIDDEN");
     check(
@@ -165,10 +184,25 @@ async function main() {
         eventId: event.id,
         cwid: "C-TEST",
         content: `Approved pagination ${i}`,
+        createdAt: new Date(Date.now() - (8 - i) * 60000),
         status: "APPROVED" as const,
       })),
     });
     const page1 = (await request(path, "GET", undefined, userCookie)).json;
+    const legacyHot = (
+      await request(path + "?sort=hot", "GET", undefined, userCookie)
+    ).json;
+    check(
+      page1.questions[0].content === "Approved pagination 7" &&
+        page1.questions.every(
+          (q: { createdAt: string }, i: number, all: { createdAt: string }[]) =>
+            i === 0 ||
+            new Date(all[i - 1].createdAt).getTime() >=
+              new Date(q.createdAt).getTime(),
+        ) &&
+        JSON.stringify(legacyHot.questions) === JSON.stringify(page1.questions),
+      "latest questions first even with legacy hot parameter",
+    );
     const page2 = (
       await request(path + "?page=2", "GET", undefined, userCookie)
     ).json;
@@ -198,11 +232,11 @@ async function main() {
       "whitelist disable",
     );
     check(
-      (await request(path, "GET", undefined, userCookie)).status === 401 &&
-        (await request(path, "POST", { content: "Blocked" }, userCookie))
-          .status === 401 &&
-        (await request(votePath, "PUT", undefined, userCookie)).status === 401,
-      "disabled CWID revokes old session for read submit and vote",
+      (await request(path)).status === 200 &&
+        (await request(path, "POST", { content: "Public guest question" }))
+          .status === 201 &&
+        (await request(path, "GET", undefined, userCookie)).status === 200,
+      "public access no longer depends on whitelist or previous sessions",
     );
     for (const [label, options] of [
       ["missing exp", { omitExp: true }],
@@ -239,8 +273,8 @@ async function main() {
     check(unsafeUrl.status === 400, "non-HTTP return links rejected");
     await db.event.update({ where: { id: event.id }, data: { active: false } });
     check(
-      (await request(path, "GET", undefined, valid.cookie)).status === 401,
-      "closed event blocks old session",
+      (await request(path, "GET", undefined, valid.cookie)).status === 404,
+      "closed event blocks public access",
     );
     console.log(`\n${checks} integration checks passed against ${origin}`);
   } finally {
