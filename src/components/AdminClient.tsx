@@ -604,12 +604,22 @@ export function AdminClient() {
                           {q.status === "PENDING" ? (
                             <>
                               <button
+                                className="button ghost small"
+                                disabled={!!busy}
+                                onClick={() => {
+                                  setPublishContent(q.content);
+                                  setNotice("问题已放入后台发布框，可翻译或修改后直接发布");
+                                }}
+                              >
+                                整理 / 翻译
+                              </button>
+                              <button
                                 className="button approve small"
                                 disabled={!!busy}
                                 onClick={() => moderate(q, "APPROVED")}
                               >
                                 <Icon name="check" size={15} />
-                                通过
+                                原文通过
                               </button>
                               <button
                                 className="button reject small"
