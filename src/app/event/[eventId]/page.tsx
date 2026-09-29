@@ -1,4 +1,4 @@
-import { EventClient } from "@/components/EventClient";
+import { redirect } from "next/navigation";
 
 export default async function EventPage({
   params,
@@ -6,5 +6,5 @@ export default async function EventPage({
   params: Promise<{ eventId: string }>;
 }) {
   const { eventId } = await params;
-  return <EventClient eventId={eventId} />;
+  redirect(`/event/${encodeURIComponent(eventId)}/ask`);
 }
