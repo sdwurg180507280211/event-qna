@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: event_qna
+      POSTGRES_USER: event_qna
+      POSTGRES_PASSWORD: event_qna
+    ports:
+      - "5432:5432"
+    volumes:
+      - event_qna_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U event_qna -d event_qna"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  event_qna_postgres:
