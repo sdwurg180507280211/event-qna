@@ -55,6 +55,7 @@ export function AdminClient() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState("");
+  const [publishContent, setPublishContent] = useState("");
   const [connected, setConnected] = useState(true);
   const requestGeneration = useRef(0);
   const actionLock = useRef(false);
@@ -176,13 +177,30 @@ export function AdminClient() {
       });
       setNotice(
         status === "APPROVED"
-          ? "已通过，问题已进入公开问题池"
+          ? "已通过，问题已进入展示页面"
           : status === "PENDING"
             ? "已重新送审"
             : status === "HIDDEN"
               ? "问题已下架"
               : "问题已拒绝",
       );
+      await loadQuestions();
+    });
+  }
+
+  function publishFromAdmin(eventObject: FormEvent) {
+    eventObject.preventDefault();
+    const content = publishContent.trim();
+    if (content.length < 2) return;
+
+    void action("publish", async () => {
+      await api("/api/admin/questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventCode, content }),
+      });
+      setPublishContent("");
+      setNotice("问题已直接发布到展示页面");
       await loadQuestions();
     });
   }
@@ -372,11 +390,19 @@ export function AdminClient() {
           <div className="header-actions">
             <a
               className="button ghost small"
-              href={`/event/${encodeURIComponent(eventCode)}`}
+              href={`/event/${encodeURIComponent(eventCode)}/ask`}
               target="_blank"
               rel="noreferrer"
             >
-              <Icon name="external" size={15} /> 查看用户端
+              <Icon name="external" size={15} /> 提问页
+            </a>
+            <a
+              className="button ghost small"
+              href={`/event/${encodeURIComponent(eventCode)}/display`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Icon name="external" size={15} /> 展示页
             </a>
             <button
               className="button ghost small"
@@ -440,6 +466,40 @@ export function AdminClient() {
           )}
           {section === "questions" && (
             <>
+              <form className="panel admin-publish-panel" onSubmit={publishFromAdmin}>
+                <div className="admin-publish-copy">
+                  <span className="eyebrow">DIRECT PUBLISH</span>
+                  <h2>后台发布问题</h2>
+                  <p className="muted">
+                    可在这里完成中译英或文字整理，然后直接发布到展示页面，无需再次审批。
+                  </p>
+                </div>
+                <div className="admin-publish-editor">
+                  <label className="sr-only" htmlFor="admin-publish-content">
+                    后台发布问题内容
+                  </label>
+                  <textarea
+                    id="admin-publish-content"
+                    className="admin-publish-input"
+                    value={publishContent}
+                    onChange={(event) => setPublishContent(event.target.value)}
+                    maxLength={1000}
+                    placeholder="在这里输入整理或翻译后的问题…"
+                    disabled={!!busy}
+                  />
+                  <div className="admin-publish-actions">
+                    <span>{publishContent.length} / 1000</span>
+                    <button
+                      className="button primary"
+                      disabled={!!busy || publishContent.trim().length < 2}
+                    >
+                      <Icon name="send" size={16} />
+                      {busy === "publish" ? "发布中…" : "直接发布到展示页"}
+                    </button>
+                  </div>
+                </div>
+              </form>
+
               <div className="stats-grid">
                 {(Object.keys(labels) as Status[]).map((status) => (
                   <button
