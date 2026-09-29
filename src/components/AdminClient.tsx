@@ -394,16 +394,15 @@ export function AdminClient() {
             </button>
           </div>
         </header>
-        <div className="admin-content">
+        <div className={`admin-content admin-content-${section}`}>
           <div className="admin-page-heading">
             <div>
-              <span className="eyebrow">EVENT MANAGEMENT</span>
               <h1>
                 {section === "questions"
-                  ? "让每个好问题被看见"
+                  ? "问题审核"
                   : section === "whitelist"
-                    ? "管理活动参与人"
-                    : "让活动拥有自己的样子"}
+                    ? "CWID 白名单"
+                    : "活动设置"}
               </h1>
               <p className="muted">
                 {eventTitle} <span className="dot-divider">·</span>{" "}
@@ -445,7 +444,8 @@ export function AdminClient() {
               <div className="stats-grid">
                 {(Object.keys(labels) as Status[]).map((status) => (
                   <button
-                    className={`stat-card stat-${status.toLowerCase()}`}
+                    className={`stat-card stat-${status.toLowerCase()} ${filter === status ? "active" : ""}`}
+                    aria-pressed={filter === status}
                     key={status}
                     onClick={() => {
                       setFilter(status);
@@ -467,63 +467,51 @@ export function AdminClient() {
                   </button>
                 ))}
               </div>
-              <section className="panel admin-section">
-                <div className="section-heading">
+              <section className="panel admin-section moderation-panel">
+                <div className="section-heading moderation-toolbar">
                   <div>
-                    <h2>问题列表</h2>
+                    <h2>
+                      {filter === "ALL" ? "全部问题" : `${labels[filter]}问题`}
+                    </h2>
                     <p className={`sync-status ${connected ? "" : "offline"}`}>
                       <span className="live-dot" />
-                      {connected ? "每 5 秒自动更新" : "连接中断，正在重试"}
+                      {connected ? "自动更新中" : "连接中断，正在重试"}
                     </p>
                   </div>
-                  <button
-                    className="button ghost small"
-                    disabled={!!busy}
-                    onClick={() => void action("refresh", loadQuestions)}
-                  >
-                    <Icon name="refresh" size={16} />
-                    刷新
-                  </button>
-                </div>
-                <div className="list-toolbar">
-                  <div
-                    className="status-tabs"
-                    role="group"
-                    aria-label="审核状态"
-                  >
-                    {(
-                      [
-                        "PENDING",
-                        "APPROVED",
-                        "REJECTED",
-                        "HIDDEN",
-                        "ALL",
-                      ] as const
-                    ).map((s) => (
-                      <button
-                        key={s}
-                        aria-pressed={filter === s}
-                        className={filter === s ? "active" : ""}
-                        onClick={() => {
-                          setFilter(s);
-                          setPage(1);
-                        }}
-                      >
-                        {s === "ALL" ? "全部" : labels[s]}
-                        {s === "PENDING" && <span>{counts.PENDING ?? 0}</span>}
-                      </button>
-                    ))}
+                  <div className="moderation-tools">
+                    <button
+                      className={`button ${filter === "ALL" ? "secondary" : "ghost"} small`}
+                      aria-pressed={filter === "ALL"}
+                      onClick={() => {
+                        setFilter("ALL");
+                        setPage(1);
+                      }}
+                    >
+                      全部问题
+                    </button>
+                    <label className="search-input">
+                      <Icon name="search" size={16} />
+                      <input
+                        aria-label="搜索问题或 CWID"
+                        placeholder="搜索问题或 CWID"
+                        value={questionSearch}
+                        onChange={(e) => setQuestionSearch(e.target.value)}
+                        maxLength={200}
+                      />
+                    </label>
+                    <button
+                      className="button ghost small"
+                      disabled={!!busy}
+                      onClick={() => void action("refresh", loadQuestions)}
+                    >
+                      <Icon name="refresh" size={16} />
+                      刷新
+                    </button>
                   </div>
-                  <label className="search-input">
-                    <Icon name="search" size={16} />
-                    <input
-                      aria-label="搜索问题或 CWID"
-                      placeholder="搜索问题或 CWID"
-                      value={questionSearch}
-                      onChange={(e) => setQuestionSearch(e.target.value)}
-                      maxLength={200}
-                    />
-                  </label>
+                </div>
+                <div className="moderation-columns" aria-hidden="true">
+                  <span>问题内容与提交信息</span>
+                  <span>审核操作</span>
                 </div>
                 <div className="admin-question-list">
                   {!questions.length ? (
@@ -611,7 +599,6 @@ export function AdminClient() {
           {section === "whitelist" && (
             <div className="whitelist-grid">
               <section className="panel admin-section">
-                <span className="eyebrow">IMPORT PARTICIPANTS</span>
                 <h2>批量添加参与人</h2>
                 <p className="muted">可直接粘贴 Excel 中的 CWID 和姓名。</p>
                 <label className="field-label" htmlFor="whitelist-bulk">

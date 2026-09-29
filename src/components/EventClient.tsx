@@ -1,5 +1,12 @@
 "use client";
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import {
+  CSSProperties,
+  FormEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { QrJoin } from "./QrJoin";
 import { Icon } from "./Icon";
 import { Brand } from "./Brand";
@@ -36,6 +43,34 @@ export function EventClient({ eventId }: { eventId: string }) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [sort, setSort] = useState<"latest" | "hot">("latest");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(6);
+  const questionList = useRef<HTMLDivElement>(null);
+  const measuredPageSize = useRef(6);
+  useEffect(() => {
+    const node = questionList.current;
+    if (!node) return;
+    const measure = () => {
+      const desktop = window.matchMedia("(min-width: 851px)").matches;
+      const rows = Math.max(
+        1,
+        Math.min(4, Math.floor((node.clientHeight + 12) / 190)),
+      );
+      const size = desktop ? rows * 2 : 6;
+      if (measuredPageSize.current !== size) {
+        measuredPageSize.current = size;
+        setPageSize(size);
+        setPage(1);
+      }
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    window.addEventListener("resize", measure);
+    measure();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
   const [total, setTotal] = useState(0);
   const [content, setContent] = useState("");
   const [message, setMessage] = useState("");
@@ -55,7 +90,7 @@ export function EventClient({ eventId }: { eventId: string }) {
   const loadQuestions = useCallback(async () => {
     const id = ++generation.current;
     const response = await fetch(
-      `${base}/questions?sort=${sort}&page=${page}`,
+      `${base}/questions?sort=${sort}&page=${page}&pageSize=${pageSize}`,
       { cache: "no-store" },
     );
     if (id !== generation.current) return;
@@ -71,7 +106,7 @@ export function EventClient({ eventId }: { eventId: string }) {
     setPage(data.page);
     setSyncError("");
     setLoading(false);
-  }, [base, goToLogin, sort, page]);
+  }, [base, goToLogin, sort, page, pageSize]);
   useEffect(() => {
     const controller = new AbortController();
     fetch(base, { signal: controller.signal, cache: "no-store" })
@@ -268,7 +303,12 @@ export function EventClient({ eventId }: { eventId: string }) {
             <span className="live-dot" />
             {syncError || "自动更新 · 仅展示已通过审核的问题"}
           </div>
-          <div className="question-list" aria-busy={loading}>
+          <div
+            ref={questionList}
+            className="question-list"
+            style={{ "--question-rows": pageSize / 2 } as CSSProperties}
+            aria-busy={loading}
+          >
             {loading ? (
               <div className="empty-state">正在加载问题…</div>
             ) : !questions.length ? (
@@ -305,7 +345,7 @@ export function EventClient({ eventId }: { eventId: string }) {
           <Pagination
             page={page}
             total={total}
-            pageSize={6}
+            pageSize={pageSize}
             onChange={setPage}
           />
         </section>
