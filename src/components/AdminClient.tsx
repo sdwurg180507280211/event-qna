@@ -19,6 +19,14 @@ type WhitelistEntry = {
   enabled: boolean;
 };
 
+type EventSettings = {
+  code: string;
+  title: string;
+  active: boolean;
+  returnUrl: string | null;
+  logoUrl: string | null;
+};
+
 const statusLabels: Record<Status, string> = {
   PENDING: "待审核",
   APPROVED: "已通过",
@@ -36,36 +44,49 @@ export function AdminClient() {
   const [bulk, setBulk] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [settings, setSettings] = useState<EventSettings | null>(null);
 
   const loadAll = useCallback(async () => {
     setError("");
 
-    const [questionResponse, whitelistResponse] = await Promise.all([
+    const [questionResponse, whitelistResponse, eventResponse] = await Promise.all([
       fetch(`/api/admin/questions?eventCode=${encodeURIComponent(eventCode)}`, {
         cache: "no-store",
       }),
       fetch(`/api/admin/whitelist?eventCode=${encodeURIComponent(eventCode)}`, {
         cache: "no-store",
       }),
+      fetch(`/api/admin/events/${encodeURIComponent(eventCode)}`, {
+        cache: "no-store",
+      }),
     ]);
 
-    if (questionResponse.status === 401 || whitelistResponse.status === 401) {
+    if (
+      questionResponse.status === 401 ||
+      whitelistResponse.status === 401 ||
+      eventResponse.status === 401
+    ) {
       setAuthenticated(false);
       return;
     }
 
-    if (!questionResponse.ok || !whitelistResponse.ok) {
-      const data = await questionResponse.json().catch(() => ({}));
-      throw new Error(data.error || "无法加载后台数据，请检查活动代码");
+    if (!questionResponse.ok || !whitelistResponse.ok || !eventResponse.ok) {
+      const response = [questionResponse, whitelistResponse, eventResponse].find(
+        (item) => !item.ok,
+      );
+      const data = await response?.json().catch(() => ({}));
+      throw new Error(data?.error || "无法加载后台数据，请检查活动代码");
     }
 
-    const [questionData, whitelistData] = await Promise.all([
+    const [questionData, whitelistData, eventData] = await Promise.all([
       questionResponse.json(),
       whitelistResponse.json(),
+      eventResponse.json(),
     ]);
 
     setQuestions(questionData.questions);
     setEntries(whitelistData.entries);
+    setSettings(eventData.event);
     setAuthenticated(true);
   }, [eventCode]);
 
@@ -180,6 +201,35 @@ export function AdminClient() {
     );
   }
 
+  async function saveSettings() {
+    if (!settings) return;
+    setError("");
+    setNotice("");
+
+    const response = await fetch(
+      `/api/admin/events/${encodeURIComponent(eventCode)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: settings.title,
+          active: settings.active,
+          returnUrl: settings.returnUrl ?? "",
+          logoUrl: settings.logoUrl ?? "",
+        }),
+      },
+    );
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setError(data.error || "活动配置保存失败");
+      return;
+    }
+
+    setSettings(data.event);
+    setNotice("活动配置已保存");
+  }
+
   async function logout() {
     await fetch("/api/admin/logout", { method: "POST" });
     setAuthenticated(false);
@@ -235,6 +285,68 @@ export function AdminClient() {
 
       {error ? <div className="error-box page-message">{error}</div> : null}
       {notice ? <div className="success-box page-message">{notice}</div> : null}
+
+      {settings ? (
+        <section className="panel admin-settings-strip">
+          <div className="settings-title">
+            <span className="eyebrow">EVENT SETTINGS</span>
+            <h2>活动配置</h2>
+          </div>
+          <label>
+            <span>活动名称</span>
+            <input
+              className="text-input"
+              value={settings.title}
+              onChange={(e) =>
+                setSettings((current) =>
+                  current ? { ...current, title: e.target.value } : current,
+                )
+              }
+            />
+          </label>
+          <label>
+            <span>返回直播地址</span>
+            <input
+              className="text-input"
+              value={settings.returnUrl ?? ""}
+              placeholder="https://..."
+              onChange={(e) =>
+                setSettings((current) =>
+                  current ? { ...current, returnUrl: e.target.value } : current,
+                )
+              }
+            />
+          </label>
+          <label>
+            <span>Logo URL</span>
+            <input
+              className="text-input"
+              value={settings.logoUrl ?? ""}
+              placeholder="https://..."
+              onChange={(e) =>
+                setSettings((current) =>
+                  current ? { ...current, logoUrl: e.target.value } : current,
+                )
+              }
+            />
+          </label>
+          <label className="active-toggle">
+            <input
+              type="checkbox"
+              checked={settings.active}
+              onChange={(e) =>
+                setSettings((current) =>
+                  current ? { ...current, active: e.target.checked } : current,
+                )
+              }
+            />
+            <span>活动启用</span>
+          </label>
+          <button className="button primary" onClick={saveSettings}>
+            保存配置
+          </button>
+        </section>
+      ) : null}
 
       <div className="admin-grid">
         <section className="panel admin-section">
