@@ -9,12 +9,15 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:migrate": "prisma migrate deploy",
+    "test:integration": "node --env-file-if-exists=.env --import tsx scripts/integration.ts",
+    "db:demo": "tsx scripts/demo.ts"
   },
   "dependencies": {
     "@prisma/client": "6.16.2",
     "jose": "6.1.0",
-    "next": "15.5.2",
+    "next": "15.5.26",
     "qrcode": "1.5.4",
     "react": "19.1.1",
     "react-dom": "19.1.1",

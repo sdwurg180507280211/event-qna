@@ -20,7 +20,11 @@ export function QrJoin({ eventId }: { eventId: string }) {
   return (
     <aside className="qr-card">
       <div className="qr-box">
-        {src ? <img src={src} alt="手机扫码参与提问" /> : <div className="qr-placeholder" />}
+        {src ? (
+          <img src={src} alt="手机扫码参与提问" />
+        ) : (
+          <div className="qr-placeholder" />
+        )}
       </div>
       <div>
         <strong>手机扫码参与提问</strong>

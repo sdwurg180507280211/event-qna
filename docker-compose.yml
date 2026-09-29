@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: event_qna
       POSTGRES_PASSWORD: event_qna
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - event_qna_postgres:/var/lib/postgresql/data
     healthcheck:

@@ -198,3 +198,15 @@ APPROVED -> HIDDEN
 ```
 
 Only `APPROVED` questions are returned to participants.
+
+## 2026-09-29 delivery revision
+
+Participant/login screens now follow the reference's blue/white visual style. Desktop Q&A includes QR joining, a two-column approved pool, latest/popular sorting, real totals and pagination. Only participant pages adapt to mobile; the moderation console is desktop-only.
+
+The admin console separates moderation, CWID whitelist and activity settings, with search, state counts, automatic refresh and re-enable. Disabling a whitelist entry now also blocks that user's existing session. Voting uses idempotent PUT (like) / DELETE (unlike), and ticket validation requires a maximum five-minute lifetime.
+
+For new installations, use `npm ci` and `npm run db:migrate` instead of `db:push`. To add explicitly labeled sample questions after the demo seed, run `npm run db:demo`.
+
+Run `npm run test:integration` against a running application on port 3036 (override with `TEST_BASE_URL`). It uses an isolated temporary event and deletes it afterward. Never run load tests against a live event.
+
+See [deployment and acceptance](docs/deployment.md), [verification results](docs/verification.md) and [.kiro specifications](.kiro/specs/event-qna-delivery/requirements.md).

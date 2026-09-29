@@ -1,59 +1,62 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { apiError } from "@/lib/http";
-import { readParticipantSession } from "@/lib/auth";
+import { participantFor } from "@/lib/participant";
 import { voterKey } from "@/lib/normalize";
 
-type Context = {
-  params: Promise<{ eventId: string; questionId: string }>;
-};
-
-export async function POST(_request: Request, context: Context) {
+type Context = { params: Promise<{ eventId: string; questionId: string }> };
+async function setVote(context: Context, voted: boolean) {
   const { eventId, questionId } = await context.params;
-  const session = await readParticipantSession();
-
-  if (!session || session.eventCode !== eventId) {
-    return apiError("Unauthorized", 401);
+  const access = await participantFor(eventId);
+  if (!access) return apiError("登录已失效，请重新验证", 401);
+  const key = voterKey(eventId, access.session.cwid);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const result = await db.$transaction(
+        async (tx) => {
+          const question = await tx.question.findFirst({
+            where: {
+              id: questionId,
+              eventId: access.event.id,
+              status: "APPROVED",
+            },
+          });
+          if (!question) return null;
+          if (voted) {
+            await tx.vote.upsert({
+              where: { questionId_voterKey: { questionId, voterKey: key } },
+              update: {},
+              create: { questionId, voterKey: key },
+            });
+          } else {
+            await tx.vote.deleteMany({ where: { questionId, voterKey: key } });
+          }
+          return {
+            voted,
+            voteCount: await tx.vote.count({ where: { questionId } }),
+          };
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+      return result
+        ? NextResponse.json(result)
+        : apiError("该问题已下架或不存在", 404);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        ["P2034", "P2002"].includes(error.code) &&
+        attempt < 3
+      )
+        continue;
+      console.error("Vote failed", error);
+      return apiError("点赞未完成，请重试", 503);
+    }
   }
-
-  const event = await db.event.findUnique({ where: { code: eventId } });
-  if (!event || !event.active) return apiError("Event not found", 404);
-
-  const question = await db.question.findFirst({
-    where: {
-      id: questionId,
-      eventId: event.id,
-      status: "APPROVED",
-    },
-    select: { id: true },
-  });
-
-  if (!question) return apiError("Question not found", 404);
-
-  const key = voterKey(event.code, session.cwid);
-  const existing = await db.vote.findUnique({
-    where: {
-      questionId_voterKey: {
-        questionId,
-        voterKey: key,
-      },
-    },
-  });
-
-  if (existing) {
-    await db.vote.delete({ where: { id: existing.id } });
-  } else {
-    await db.vote.create({
-      data: {
-        questionId,
-        voterKey: key,
-      },
-    });
-  }
-
-  const voteCount = await db.vote.count({ where: { questionId } });
-  return NextResponse.json({
-    voted: !existing,
-    voteCount,
-  });
+}
+export async function PUT(_request: Request, context: Context) {
+  return setVote(context, true);
+}
+export async function DELETE(_request: Request, context: Context) {
+  return setVote(context, false);
 }

@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     }
 
     if (!safeEqual(password, expected)) {
-      return apiError("Invalid password", 401);
+      return apiError("管理员密码不正确", 401);
     }
 
     const token = await signAdminSession();

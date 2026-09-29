@@ -10,3 +10,8 @@ coverage
 .DS_Store
 *.log
 .prisma
+
+.env.production
+.local/
+artifacts/
+*.tsbuildinfo

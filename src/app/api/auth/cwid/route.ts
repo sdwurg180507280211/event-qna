@@ -15,9 +15,11 @@ export async function POST(request: Request) {
     const input = schema.parse(await request.json());
     const cwid = normalizeCwid(input.cwid);
 
-    const event = await db.event.findUnique({ where: { code: input.eventCode } });
+    const event = await db.event.findUnique({
+      where: { code: input.eventCode },
+    });
     if (!event || !event.active) {
-      return apiError("Event not found or inactive", 404);
+      return apiError("活动不存在或已结束", 404);
     }
 
     const entry = await db.whitelistEntry.findUnique({
@@ -30,7 +32,7 @@ export async function POST(request: Request) {
     });
 
     if (!entry?.enabled) {
-      return apiError("CWID is not authorized for this event", 403);
+      return apiError("该 CWID 不在本次活动白名单内或已被禁用", 403);
     }
 
     const token = await signParticipantSession({

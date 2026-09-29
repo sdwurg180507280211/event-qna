@@ -18,9 +18,11 @@ export async function POST(request: Request) {
     const input = schema.parse(await request.json());
     const identity = await verifyStreamTicket(input.ticket, input.eventCode);
 
-    const event = await db.event.findUnique({ where: { code: input.eventCode } });
+    const event = await db.event.findUnique({
+      where: { code: input.eventCode },
+    });
     if (!event || !event.active) {
-      return apiError("Event not found or inactive", 404);
+      return apiError("活动不存在或已结束", 404);
     }
 
     if (process.env.STREAM_REQUIRE_WHITELIST === "true") {
@@ -34,7 +36,7 @@ export async function POST(request: Request) {
       });
 
       if (!entry?.enabled) {
-        return apiError("CWID is not authorized for this event", 403);
+        return apiError("该 CWID 不在本次活动白名单内或已被禁用", 403);
       }
     }
 
@@ -44,6 +46,9 @@ export async function POST(request: Request) {
     return response;
   } catch (error) {
     console.error("Ticket exchange failed", error);
-    return apiError("Invalid or expired livestream ticket", 401);
+    return apiError(
+      "直播登录凭证无效或已过期，请重新从直播间进入，或输入 CWID 登录",
+      401,
+    );
   }
 }

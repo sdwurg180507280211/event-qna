@@ -1,15 +1,16 @@
 "use client";
-
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { QrJoin } from "@/components/QrJoin";
-
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { QrJoin } from "./QrJoin";
+import { Icon } from "./Icon";
+import { Brand } from "./Brand";
+import { Pagination } from "./Pagination";
+import { QuestionBody } from "./QuestionBody";
 type EventInfo = {
   code: string;
   title: string;
   returnUrl: string | null;
   logoUrl: string | null;
 };
-
 type Question = {
   id: string;
   content: string;
@@ -17,244 +18,320 @@ type Question = {
   voteCount: number;
   hasVoted: boolean;
 };
-
+function relativeTime(value: string) {
+  const minutes = Math.max(
+    0,
+    Math.floor((Date.now() - new Date(value).getTime()) / 60000),
+  );
+  return minutes < 1
+    ? "刚刚"
+    : minutes < 60
+      ? `${minutes} 分钟前`
+      : minutes < 1440
+        ? `${Math.floor(minutes / 60)} 小时前`
+        : `${Math.floor(minutes / 1440)} 天前`;
+}
 export function EventClient({ eventId }: { eventId: string }) {
   const [event, setEvent] = useState<EventInfo | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [sort, setSort] = useState<"latest" | "hot">("latest");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [content, setContent] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [syncError, setSyncError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  const goToLogin = useCallback(() => {
-    window.location.replace(`/event/${encodeURIComponent(eventId)}/login`);
-  }, [eventId]);
-
+  const [loading, setLoading] = useState(true);
+  const [voting, setVoting] = useState<string[]>([]);
+  const voteLocks = useRef(new Set<string>());
+  const generation = useRef(0);
+  const base = `/api/events/${encodeURIComponent(eventId)}`;
+  const goToLogin = useCallback(
+    () =>
+      window.location.replace(`/event/${encodeURIComponent(eventId)}/login`),
+    [eventId],
+  );
   const loadQuestions = useCallback(async () => {
+    const id = ++generation.current;
     const response = await fetch(
-      `/api/events/${encodeURIComponent(eventId)}/questions?sort=${sort}`,
+      `${base}/questions?sort=${sort}&page=${page}`,
       { cache: "no-store" },
     );
-
+    if (id !== generation.current) return;
     if (response.status === 401) {
       goToLogin();
       return;
     }
-
-    if (!response.ok) {
-      throw new Error("无法加载问题池");
-    }
-
+    if (!response.ok) throw new Error("暂时无法更新问题池，请检查网络");
     const data = await response.json();
+    if (id !== generation.current) return;
     setQuestions(data.questions);
-  }, [eventId, goToLogin, sort]);
-
+    setTotal(data.total);
+    setPage(data.page);
+    setSyncError("");
+    setLoading(false);
+  }, [base, goToLogin, sort, page]);
   useEffect(() => {
-    fetch(`/api/events/${encodeURIComponent(eventId)}`, { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("活动不存在或已结束");
-        return response.json();
+    const controller = new AbortController();
+    fetch(base, { signal: controller.signal, cache: "no-store" })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("活动不存在或已结束");
+        setEvent((await r.json()).event);
       })
-      .then((data) => setEvent(data.event))
-      .catch((cause) => setError(cause instanceof Error ? cause.message : "无法加载活动"));
-  }, [eventId]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const refresh = () => {
-      loadQuestions().catch((cause) => {
-        if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : "无法加载问题池");
-        }
+      .catch((e) => {
+        if (!controller.signal.aborted) setError(e.message);
       });
+    return () => controller.abort();
+  }, [base]);
+  useEffect(() => {
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const refresh = async () => {
+      try {
+        if (!document.hidden) await loadQuestions();
+      } catch {
+        if (!stopped) {
+          setSyncError("连接中断，正在尝试重新连接…");
+          setLoading(false);
+        }
+      }
+      if (!stopped) timer = setTimeout(refresh, 4000);
     };
-
-    refresh();
-    const timer = window.setInterval(refresh, 4000);
+    void refresh();
     return () => {
-      cancelled = true;
-      window.clearInterval(timer);
+      stopped = true;
+      clearTimeout(timer);
+      generation.current++;
     };
   }, [loadQuestions]);
-
-  async function submitQuestion(eventObject: FormEvent) {
-    eventObject.preventDefault();
-    if (!content.trim()) return;
-
+  async function submitQuestion(e: FormEvent) {
+    e.preventDefault();
+    if (submitting || content.trim().length < 2) return;
     setSubmitting(true);
     setError("");
     setMessage("");
-
     try {
-      const response = await fetch(
-        `/api/events/${encodeURIComponent(eventId)}/questions`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content }),
-        },
-      );
-
-      if (response.status === 401) {
+      const r = await fetch(`${base}/questions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (r.status === 401) {
         goToLogin();
         return;
       }
-
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "提交失败");
-
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "提交失败，请重试");
       setContent("");
-      setMessage("问题已提交，审核通过后会出现在问题池。");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "提交失败");
+      setMessage("问题已提交，审核通过后将出现在问题池。");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "网络异常，请重试");
     } finally {
       setSubmitting(false);
     }
   }
-
-  async function toggleVote(questionId: string) {
-    const response = await fetch(
-      `/api/events/${encodeURIComponent(eventId)}/questions/${questionId}/vote`,
-      { method: "POST" },
-    );
-
-    if (response.status === 401) {
-      goToLogin();
-      return;
+  async function toggleVote(q: Question) {
+    if (voteLocks.current.has(q.id)) return;
+    voteLocks.current.add(q.id);
+    setVoting([...voteLocks.current]);
+    try {
+      const r = await fetch(`${base}/questions/${q.id}/vote`, {
+        method: q.hasVoted ? "DELETE" : "PUT",
+      });
+      if (r.status === 401) {
+        goToLogin();
+        return;
+      }
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "点赞失败");
+      setQuestions((current) =>
+        current.map((item) =>
+          item.id === q.id
+            ? { ...item, hasVoted: data.voted, voteCount: data.voteCount }
+            : item,
+        ),
+      );
+      await loadQuestions();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "网络异常，请重试");
+    } finally {
+      voteLocks.current.delete(q.id);
+      setVoting([...voteLocks.current]);
     }
-
-    if (!response.ok) {
-      setError("点赞失败，请稍后重试");
-      return;
-    }
-
-    const data = await response.json();
-    setQuestions((current) =>
-      current.map((question) =>
-        question.id === questionId
-          ? {
-              ...question,
-              hasVoted: data.voted,
-              voteCount: data.voteCount,
-            }
-          : question,
-      ),
-    );
   }
-
   async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    goToLogin();
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      goToLogin();
+    } catch {
+      setError("退出失败，请重试");
+    }
   }
-
   return (
     <main className="event-shell">
       <header className="event-header">
-        <div className="brand-lockup">
-          <span className="brand-dot" />
-          <strong>{event?.title ?? "Event Q&A"}</strong>
-        </div>
-        <div className="header-actions">
-          {event?.returnUrl ? (
-            <a className="button ghost small" href={event.returnUrl}>
-              返回直播
+        <div>
+          {event?.returnUrl && (
+            <a className="back-link" href={event.returnUrl}>
+              <Icon name="arrow" size={16} /> 返回直播
             </a>
-          ) : null}
-          <button className="button ghost small" onClick={logout}>
-            退出
-          </button>
+          )}
         </div>
+        <Brand title={event?.title} logoUrl={event?.logoUrl} />
+        <button className="button ghost small" onClick={logout}>
+          <Icon name="logout" size={16} /> 退出
+        </button>
       </header>
-
+      <div className="event-intro">
+        <span>
+          <span className="live-dot" /> 现场互动 · Q&A
+        </span>
+        <span>分享你的问题，一起开启对话</span>
+      </div>
       <div className="event-grid">
         <aside className="ask-column">
           <section className="panel ask-card">
             <div className="section-heading">
-              <div>
-                <span className="eyebrow">ASK</span>
-                <h2>我想提问</h2>
-              </div>
-              <span className="anonymous-pill">匿名提问</span>
+              <h1>我想提问</h1>
+              <span className="anonymous-pill">
+                <Icon name="shield" size={14} /> 匿名提问
+              </span>
             </div>
-
+            <p className="muted composer-hint">你的好奇，让对话更进一步。</p>
             <form onSubmit={submitQuestion}>
+              <label className="sr-only" htmlFor="question-content">
+                问题内容
+              </label>
               <textarea
+                id="question-content"
                 className="question-input"
-                placeholder="请输入您想问的问题……"
+                placeholder="请输入您想问的问题…"
                 maxLength={1000}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
+                disabled={submitting}
               />
-              <div className="composer-footer">
-                <span>{content.length}/1000</span>
-                <button
-                  className="button primary"
-                  disabled={submitting || content.trim().length < 2}
-                >
-                  {submitting ? "提交中…" : "提交问题"}
-                </button>
+              <div className="composer-counter">
+                <span>至少 2 个字符</span>
+                <span>{content.length} / 1000</span>
               </div>
+              <button
+                className="button primary wide"
+                disabled={!event || submitting || content.trim().length < 2}
+              >
+                <Icon name="send" size={17} />
+                {submitting ? "提交中…" : "提交问题"}
+              </button>
             </form>
-
-            {message ? <div className="success-box">{message}</div> : null}
-            {error ? <div className="error-box">{error}</div> : null}
+            <p className="privacy-note">
+              <Icon name="shield" size={14} /> 问题公开时不显示姓名或 CWID
+            </p>
+            {message && (
+              <div className="success-box" role="status">
+                {message}
+              </div>
+            )}
+            {error && (
+              <div className="error-box" role="alert">
+                {error}
+              </div>
+            )}
           </section>
-
           <QrJoin eventId={eventId} />
+          <p className="ask-note">
+            每一个问题都值得认真对待。
+            <br />
+            提交后请耐心等待工作人员审核。
+          </p>
         </aside>
-
-        <section className="panel question-pool">
+        <section className="panel question-pool" aria-label="问题池">
           <div className="pool-header">
-            <div>
-              <span className="eyebrow">QUESTIONS</span>
-              <h2>问题池</h2>
-              <p className="muted">共 {questions.length} 条已通过审核的问题</p>
+            <div className="pool-title">
+              <span className="pool-icon">
+                <Icon name="chat" size={23} />
+              </span>
+              <div>
+                <h2>
+                  问题池 <span className="count-badge">{total}</span>
+                </h2>
+                <p className="muted">
+                  发现大家关心的问题，为你感兴趣的提问点赞
+                </p>
+              </div>
             </div>
             <div className="segmented" role="group" aria-label="问题排序">
-              <button
-                className={sort === "latest" ? "active" : ""}
-                onClick={() => setSort("latest")}
-              >
-                最新
-              </button>
-              <button
-                className={sort === "hot" ? "active" : ""}
-                onClick={() => setSort("hot")}
-              >
-                热门
-              </button>
+              {(["latest", "hot"] as const).map((value) => (
+                <button
+                  key={value}
+                  aria-pressed={sort === value}
+                  className={sort === value ? "active" : ""}
+                  onClick={() => {
+                    setSort(value);
+                    setPage(1);
+                  }}
+                >
+                  {value === "latest" ? "最新" : "热门"}
+                </button>
+              ))}
             </div>
           </div>
-
-          <div className="question-list">
-            {questions.length === 0 ? (
+          <div
+            className={`sync-status ${syncError ? "offline" : ""}`}
+            role="status"
+          >
+            <span className="live-dot" />
+            {syncError || "自动更新 · 仅展示已通过审核的问题"}
+          </div>
+          <div className="question-list" aria-busy={loading}>
+            {loading ? (
+              <div className="empty-state">正在加载问题…</div>
+            ) : !questions.length ? (
               <div className="empty-state">
-                <strong>暂时还没有已发布的问题</strong>
-                <p>提交的问题会在管理员审核通过后显示在这里。</p>
+                <span className="empty-icon">
+                  <Icon name="chat" size={36} />
+                </span>
+                <h3>对话，从你的第一个问题开始</h3>
+                <p>通过审核的问题会出现在这里。</p>
               </div>
             ) : (
-              questions.map((question) => (
-                <article className="question-card" key={question.id}>
+              questions.map((q) => (
+                <article className="question-card" key={q.id}>
                   <div className="question-meta">
+                    <span className="anonymous-avatar">
+                      <Icon name="users" size={15} />
+                    </span>
                     <strong>匿名</strong>
-                    <span>{new Date(question.createdAt).toLocaleString()}</span>
+                    <time title={new Date(q.createdAt).toLocaleString("zh-CN")}>
+                      {relativeTime(q.createdAt)}
+                    </time>
+                    <button
+                      className={`vote-button ${q.hasVoted ? "voted" : ""}`}
+                      aria-label={q.hasVoted ? "取消点赞" : "点赞"}
+                      aria-pressed={q.hasVoted}
+                      disabled={voting.includes(q.id)}
+                      onClick={() => toggleVote(q)}
+                    >
+                      <Icon name="like" size={17} />
+                      <span>{q.voteCount}</span>
+                    </button>
                   </div>
-                  <p>{question.content}</p>
-                  <button
-                    className={`vote-button ${question.hasVoted ? "voted" : ""}`}
-                    onClick={() => toggleVote(question.id)}
-                    aria-label={question.hasVoted ? "取消点赞" : "点赞"}
-                  >
-                    ♡ <span>{question.voteCount}</span>
-                  </button>
+                  <QuestionBody content={q.content} />
                 </article>
               ))
             )}
           </div>
+          <Pagination
+            page={page}
+            total={total}
+            pageSize={6}
+            onChange={setPage}
+          />
         </section>
       </div>
+      <footer className="site-footer">
+        Event Q&A <span>·</span> 让沟通更近一步
+      </footer>
     </main>
   );
 }

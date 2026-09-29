@@ -1,0 +1,13 @@
+[Unit]
+Description=Event Q&A web application
+Wants=network-online.target
+After=network-online.target event-qna-db.service
+Requires=event-qna-db.service
+[Service]
+Restart=always
+RestartSec=5
+TimeoutStopSec=40
+ExecStart=/usr/bin/podman start -a event-qna-web
+ExecStop=/usr/bin/podman stop -t 20 event-qna-web
+[Install]
+WantedBy=multi-user.target

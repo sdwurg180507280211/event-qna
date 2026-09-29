@@ -52,7 +52,9 @@ export async function POST(request: Request) {
 
   try {
     const input = entriesSchema.parse(await request.json());
-    const event = await db.event.findUnique({ where: { code: input.eventCode } });
+    const event = await db.event.findUnique({
+      where: { code: input.eventCode },
+    });
     if (!event) return apiError("Event not found", 404);
 
     const entries = input.entries.map((entry) => ({
@@ -98,7 +100,9 @@ export async function DELETE(request: Request) {
 
   try {
     const input = deleteSchema.parse(await request.json());
-    const event = await db.event.findUnique({ where: { code: input.eventCode } });
+    const event = await db.event.findUnique({
+      where: { code: input.eventCode },
+    });
     if (!event) return apiError("Event not found", 404);
 
     const cwid = normalizeCwid(input.cwid);

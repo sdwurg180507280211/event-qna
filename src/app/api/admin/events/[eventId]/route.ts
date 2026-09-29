@@ -10,8 +10,32 @@ type Context = {
 
 const updateSchema = z.object({
   title: z.string().trim().min(1).max(200),
-  returnUrl: z.union([z.string().trim().url(), z.literal("")]).optional(),
-  logoUrl: z.union([z.string().trim().url(), z.literal("")]).optional(),
+  returnUrl: z
+    .union([
+      z
+        .string()
+        .trim()
+        .url()
+        .refine(
+          (value) => /^https?:\/\//i.test(value),
+          "仅支持 HTTP/HTTPS 地址",
+        ),
+      z.literal(""),
+    ])
+    .optional(),
+  logoUrl: z
+    .union([
+      z
+        .string()
+        .trim()
+        .url()
+        .refine(
+          (value) => /^https?:\/\//i.test(value),
+          "仅支持 HTTP/HTTPS 地址",
+        ),
+      z.literal(""),
+    ])
+    .optional(),
   active: z.boolean(),
 });
 

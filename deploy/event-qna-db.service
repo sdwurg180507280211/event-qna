@@ -1,0 +1,12 @@
+[Unit]
+Description=Event Q&A PostgreSQL
+Wants=network-online.target
+After=network-online.target
+[Service]
+Restart=always
+RestartSec=5
+TimeoutStopSec=40
+ExecStart=/usr/bin/podman start -a event-qna-db
+ExecStop=/usr/bin/podman stop -t 20 event-qna-db
+[Install]
+WantedBy=multi-user.target

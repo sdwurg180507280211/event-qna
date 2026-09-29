@@ -76,7 +76,9 @@ export async function readParticipantSession(): Promise<ParticipantSession | nul
 export function setParticipantCookie(response: NextResponse, token: string) {
   response.cookies.set(PARTICIPANT_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure:
+      process.env.COOKIE_SECURE !== "false" &&
+      process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 8,
@@ -86,14 +88,19 @@ export function setParticipantCookie(response: NextResponse, token: string) {
 export function clearParticipantCookie(response: NextResponse) {
   response.cookies.set(PARTICIPANT_COOKIE, "", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure:
+      process.env.COOKIE_SECURE !== "false" &&
+      process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     expires: new Date(0),
   });
 }
 
-export async function verifyStreamTicket(ticket: string, expectedEventCode: string) {
+export async function verifyStreamTicket(
+  ticket: string,
+  expectedEventCode: string,
+) {
   const issuer = process.env.STREAM_TICKET_ISSUER ?? "livestream";
   const audience = process.env.STREAM_TICKET_AUDIENCE ?? "event-qna";
 
@@ -101,10 +108,18 @@ export async function verifyStreamTicket(ticket: string, expectedEventCode: stri
     issuer,
     audience,
     algorithms: ["HS256"],
+    requiredClaims: ["sub", "iat", "exp", "eventCode"],
+    maxTokenAge: "5m",
   });
 
   if (
     typeof payload.sub !== "string" ||
+    !payload.sub.trim() ||
+    payload.sub.length > 100 ||
+    typeof payload.exp !== "number" ||
+    typeof payload.iat !== "number" ||
+    payload.exp <= payload.iat ||
+    payload.exp - payload.iat > 300 ||
     typeof payload.eventCode !== "string" ||
     payload.eventCode !== expectedEventCode
   ) {
@@ -149,7 +164,9 @@ export async function isAdmin() {
 export function setAdminCookie(response: NextResponse, token: string) {
   response.cookies.set(ADMIN_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure:
+      process.env.COOKIE_SECURE !== "false" &&
+      process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 8,
@@ -159,7 +176,9 @@ export function setAdminCookie(response: NextResponse, token: string) {
 export function clearAdminCookie(response: NextResponse) {
   response.cookies.set(ADMIN_COOKIE, "", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure:
+      process.env.COOKIE_SECURE !== "false" &&
+      process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     expires: new Date(0),

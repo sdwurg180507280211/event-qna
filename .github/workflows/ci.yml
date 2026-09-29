@@ -1,38 +1,43 @@
 name: CI
-
 on:
   push:
     branches: [main]
   pull_request:
-
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: event_qna
+          POSTGRES_USER: event_qna
+          POSTGRES_PASSWORD: event_qna
+        ports: [5432:5432]
+        options: --health-cmd="pg_isready -U event_qna -d event_qna" --health-interval=5s --health-timeout=5s --health-retries=10
     env:
       DATABASE_URL: postgresql://event_qna:event_qna@localhost:5432/event_qna?schema=public
       SESSION_SECRET: ci-session-secret-at-least-32-characters
       STREAM_SSO_SECRET: ci-stream-secret-at-least-32-characters
       ADMIN_PASSWORD: ci-admin-password
-
+      COOKIE_SECURE: "false"
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
-
-      - name: Generate Prisma client
-        run: npm run db:generate
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Build
-        run: npm run build
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run db:generate
+      - run: npm run db:migrate
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Run business integration checks
+        run: |
+          npm run start -- --port 3036 > /tmp/event-qna-server.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3036/api/health; then break; fi
+            sleep 2
+          done
+          npm run test:integration

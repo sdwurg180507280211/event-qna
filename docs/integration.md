@@ -22,7 +22,8 @@ Required claims:
 | `eventCode` | Event Q&A event code |
 | `iss` | configured livestream issuer |
 | `aud` | configured Event Q&A audience |
-| `exp` | expiry, recommended <= 5 minutes |
+| `iat` | issued-at timestamp, required |
+| `exp` | expiry, required; greater than iat and at most 300 seconds later |
 
 Optional claim:
 
@@ -39,6 +40,7 @@ Example payload:
   "eventCode": "annual-dialogue",
   "iss": "livestream",
   "aud": "event-qna",
+  "iat": 1790647200,
   "exp": 1790647500
 }
 ```
@@ -72,3 +74,7 @@ const ticket = await new SignJWT({
 - keep ticket lifetime short;
 - rotate secrets if exposed;
 - optionally enable `STREAM_REQUIRE_WHITELIST=true` if livestream users must also be on the local whitelist.
+
+Tickets are short-lived bearer credentials, not single-use tokens. Replay prevention using a persisted `jti` can be added if required by the livestream provider. The login page removes the ticket query immediately and sends `Referrer-Policy: no-referrer`.
+
+The `STREAM_REQUIRE_WHITELIST` setting applies during both ticket exchange and subsequent participant requests. Whitelist-login sessions always re-check current eligibility.

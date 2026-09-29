@@ -78,3 +78,13 @@ Approved questions are shown anonymously to participants.
 - an invalid/expired livestream ticket is rejected;
 - admin endpoints require an admin session;
 - participant and admin session cookies are HTTP-only.
+
+## Delivery refinement (2026-09-29)
+
+- Admin interface is desktop-only by request; participant login and Q&A support mobile.
+- Desktop QR joins the current public activity login page on a phone.
+- Public pool includes server pagination and total, expandable long questions and explicit vote/unvote operations.
+- Admin adds search, per-state counts, automatic refresh, whitelist re-enable and editable activity/brand settings.
+- Disabling a whitelist participant invalidates existing sessions on their next request.
+- Livestream tickets must contain iat/exp, be at most five minutes old and have a lifetime no longer than five minutes.
+- The HTTP server address is for acceptance; actual livestream integration and production domain/HTTPS are separate integration steps.

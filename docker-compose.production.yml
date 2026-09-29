@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: event_qna
+      POSTGRES_USER: event_qna
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U event_qna -d event_qna]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+  web:
+    build: .
+    restart: unless-stopped
+    env_file: .env.production
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3036}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+volumes:
+  postgres_data:
