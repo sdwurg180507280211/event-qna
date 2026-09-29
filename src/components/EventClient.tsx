@@ -183,12 +183,6 @@ export function EventClient({ eventId }: { eventId: string }) {
           <Icon name="logout" size={16} /> 退出
         </button>
       </header>
-      <div className="event-intro">
-        <span>
-          <span className="live-dot" /> 现场互动 · Q&A
-        </span>
-        <span>分享你的问题，一起开启对话</span>
-      </div>
       <div className="event-grid">
         <aside className="ask-column">
           <section className="panel ask-card">
@@ -198,7 +192,6 @@ export function EventClient({ eventId }: { eventId: string }) {
                 <Icon name="shield" size={14} /> 匿名提问
               </span>
             </div>
-            <p className="muted composer-hint">你的好奇，让对话更进一步。</p>
             <form onSubmit={submitQuestion}>
               <label className="sr-only" htmlFor="question-content">
                 问题内容
@@ -239,11 +232,6 @@ export function EventClient({ eventId }: { eventId: string }) {
             )}
           </section>
           <QrJoin eventId={eventId} />
-          <p className="ask-note">
-            每一个问题都值得认真对待。
-            <br />
-            提交后请耐心等待工作人员审核。
-          </p>
         </aside>
         <section className="panel question-pool" aria-label="问题池">
           <div className="pool-header">
@@ -255,9 +243,6 @@ export function EventClient({ eventId }: { eventId: string }) {
                 <h2>
                   问题池 <span className="count-badge">{total}</span>
                 </h2>
-                <p className="muted">
-                  发现大家关心的问题，为你感兴趣的提问点赞
-                </p>
               </div>
             </div>
             <div className="segmented" role="group" aria-label="问题排序">
@@ -288,11 +273,7 @@ export function EventClient({ eventId }: { eventId: string }) {
               <div className="empty-state">正在加载问题…</div>
             ) : !questions.length ? (
               <div className="empty-state">
-                <span className="empty-icon">
-                  <Icon name="chat" size={36} />
-                </span>
-                <h3>对话，从你的第一个问题开始</h3>
-                <p>通过审核的问题会出现在这里。</p>
+                <p>暂无已通过审核的问题</p>
               </div>
             ) : (
               questions.map((q) => (
@@ -329,9 +310,6 @@ export function EventClient({ eventId }: { eventId: string }) {
           />
         </section>
       </div>
-      <footer className="site-footer">
-        Event Q&A <span>·</span> 让沟通更近一步
-      </footer>
     </main>
   );
 }

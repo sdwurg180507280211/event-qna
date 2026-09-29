@@ -1569,3 +1569,127 @@ a:focus-visible {
 .admin-shell {
   min-width: 1100px;
 }
+
+/* Keep the participant workspace compact without clipping long questions. */
+.event-shell .event-header {
+  min-height: 60px;
+  padding: 10px 24px;
+}
+.event-header .brand-lockup small {
+  display: none;
+}
+.event-header .brand-symbol {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+.event-header .brand-logo {
+  max-height: 34px;
+}
+.event-shell .event-grid {
+  grid-template-columns: 300px minmax(0, 1fr);
+  padding: 16px 24px;
+  gap: 16px;
+  align-items: start;
+}
+.event-shell .ask-column {
+  gap: 12px;
+}
+.event-shell .ask-card,
+.event-shell .question-pool {
+  padding: 18px;
+}
+.event-shell .ask-card h1,
+.event-shell .pool-title h2 {
+  font-size: 21px;
+  margin: 0;
+}
+.event-shell .question-input {
+  min-height: 0;
+  height: 160px;
+  margin-top: 14px;
+  padding: 12px;
+  resize: vertical;
+}
+.event-shell .composer-counter {
+  padding: 7px 0 12px;
+}
+.event-shell .qr-card {
+  padding: 14px;
+  gap: 12px;
+}
+.event-shell .qr-box,
+.event-shell .qr-box img,
+.event-shell .qr-placeholder {
+  width: 100px;
+  height: 100px;
+  flex-basis: 100px;
+}
+.event-shell .question-pool {
+  min-height: 0;
+}
+.event-shell .pool-icon {
+  padding: 7px;
+}
+.event-shell .pool-title {
+  align-items: center;
+}
+.event-shell .sync-status {
+  margin-top: 10px;
+}
+.event-shell .question-list {
+  margin-top: 12px;
+  gap: 10px;
+  flex: none;
+}
+.event-shell .question-card {
+  min-height: 0;
+  padding: 12px 14px;
+  align-self: stretch;
+}
+.event-shell .question-card p {
+  font-size: 14px;
+  line-height: 1.65;
+  margin-top: 8px;
+}
+.event-shell .question-card .text-button {
+  margin-top: 5px;
+}
+.event-shell .pagination {
+  margin-top: 14px;
+  padding-top: 12px;
+}
+.event-shell .empty-state {
+  padding: 32px 12px;
+}
+@media (max-width: 1150px) and (min-width: 851px) {
+  .event-shell .event-grid {
+    grid-template-columns: 270px minmax(0, 1fr);
+    padding: 12px 16px;
+    gap: 12px;
+  }
+  .event-shell .ask-card,
+  .event-shell .question-pool {
+    padding: 14px;
+  }
+}
+@media (max-width: 850px) {
+  .event-shell .event-header {
+    padding: 10px 14px;
+    min-height: 56px;
+  }
+  .event-shell .event-grid {
+    grid-template-columns: 1fr;
+    padding: 12px;
+    gap: 12px;
+  }
+  .event-shell .ask-card,
+  .event-shell .question-pool {
+    padding: 14px;
+  }
+  .event-shell .question-input {
+    height: 100px;
+    margin-top: 10px;
+    font-size: 16px;
+  }
+}
