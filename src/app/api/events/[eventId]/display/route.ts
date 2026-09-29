@@ -30,7 +30,6 @@ export async function GET(_request: Request, context: Context) {
     db.question.findMany({
       where,
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: 500,
       select: {
         id: true,
         content: true,
